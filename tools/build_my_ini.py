@@ -37,9 +37,10 @@ REMOVE_GROUPS = {
 }
 
 # 「自动选择」组的行为：
-#   "select"   = 手动选，点哪个用哪个，不会再自己跳
-#   "url-test" = 保留自动测速，但用下面的容差让它别频繁换节点
-AUTO_MODE = "select"
+#   "url-test" = 自动在全部节点里挑一个能用的（推荐：CF 优选 IP 会不断有挂掉的）
+#   "select"   = 固定用你手点的那个节点；注意：如果那个节点挂了，
+#                所有把它当成员的 fallback 分组（GitHub/ChatGPT 等）会自动跳到「全球直连」
+AUTO_MODE = "url-test"
 AUTO_TOLERANCE = "500"
 TEST_URL = "http://www.gstatic.com/generate_204"
 
