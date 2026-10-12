@@ -73,18 +73,6 @@ def rebuild_auto(fields):
     return [fields[0], "url-test", regex, url, f"300,{AUTO_TOLERANCE},50"]
 
 
-def dedup_members(fields):
-    """去掉重复的 []成员"""
-    seen, out = set(), []
-    for f in fields:
-        if f.startswith("[]"):
-            if f in seen:
-                continue
-            seen.add(f)
-        out.append(f)
-    return out
-
-
 def build(src: pathlib.Path, dst: pathlib.Path) -> int:
     if not src.exists():
         print(f"[错误] 找不到源文件 {src}")
@@ -114,31 +102,41 @@ def build(src: pathlib.Path, dst: pathlib.Path) -> int:
                 continue
 
             if name in FORCE_MEMBERS:
-                fields = [fields[0], fields[1]] + [f"[]{m}" for m in FORCE_MEMBERS[name]]
+                # 成员换成新的，但行尾的测速参数（url/间隔）必须原样保留，
+                # 否则 fallback/url-test 分组会因为缺测速地址被丢弃
+                params = [f for f in fields[2:] if not f.startswith("[]")]
+                fields = [fields[0], fields[1]] + [f"[]{m}" for m in FORCE_MEMBERS[name]] + params
                 fixed.append(name)
                 out_lines.append("custom_proxy_group=" + "`".join(fields))
                 continue
 
             # 普通分组：删掉对被移除分组的引用
-            new_fields, lost_proxy = [], False
-            for i, f in enumerate(fields):
-                if i >= 2 and f.startswith("[]") and f[2:].strip() in REMOVE_GROUPS:
-                    if f[2:].strip() not in ("DIRECT", "REJECT"):
-                        lost_proxy = True
-                    continue
-                new_fields.append(f)
-            new_fields = dedup_members(new_fields)
+            gtype = fields[1] if len(fields) > 1 else "select"
+            members, params, lost_proxy = [], [], False
+            for f in fields[2:]:
+                if f.startswith("[]"):
+                    target = f[2:].strip()
+                    if target in REMOVE_GROUPS:
+                        if target not in ("DIRECT", "REJECT"):
+                            lost_proxy = True
+                        continue
+                    if target and target not in members:
+                        members.append(target)
+                else:
+                    params.append(f)
 
-            members = [f[2:].strip() for f in new_fields[2:] if f.startswith("[]")]
             if lost_proxy and AUTO not in members:
                 # 原来靠地区分组走代理，现在这些组没了 → 改成走「自动选择」，别退化成直连
-                new_fields = new_fields[:2] + [f"[]{AUTO}"] + new_fields[2:]
+                members.insert(0, AUTO)
                 fixed.append(name)
-            if name in AUTO_FIRST_GROUPS and AUTO in [f[2:].strip() for f in new_fields[2:] if f.startswith("[]")]:
-                rest = [f for f in new_fields[2:] if not (f.startswith("[]") and f[2:].strip() == AUTO)]
-                new_fields = new_fields[:2] + [f"[]{AUTO}"] + rest
-            if len(new_fields) < 3:
-                new_fields.append("[]DIRECT")
+            if name in AUTO_FIRST_GROUPS and AUTO in members:
+                members.remove(AUTO)
+                members.insert(0, AUTO)
+            if not members and not params:
+                # 成员被删光、也没有正则可用 → 兜底
+                members = [AUTO, "DIRECT"] if gtype in ("select", "fallback") else [AUTO]
+
+            new_fields = [fields[0], gtype] + [f"[]{m}" for m in members] + params
             out_lines.append("custom_proxy_group=" + "`".join(new_fields))
             continue
 
