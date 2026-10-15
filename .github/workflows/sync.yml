@@ -1,22 +1,12 @@
-# 用途：每天自动做三件事
-#   ① 取上游 Aethersailor/Custom_OpenClash_Rules 的最新模板/规则文件
-#   ② 用 tools/build_my_ini.py 依据上游模板重新生成 cfg/My_Clash.ini
-#   ③ 把结果提交回你的仓库
-# 放置位置：.github/workflows/sync.yml（整个文件内容替换成下面这些）
-# 配套文件：tools/build_my_ini.py
-#
-# 说明：这里刻意"不做 git merge"，只把上游的文件取过来覆盖。
-#       好处是永远不会冲突、也不需要生成合并提交，
-#       所以不会再出现 "Committer identity unknown / empty ident name" 这类报错。
 name: 自动同步上游并生成我的模板
 
 on:
   schedule:
-    - cron: "0 20 * * *"   # 每天 04:00（北京时间 UTC+8）
-  workflow_dispatch:       # 想立刻跑一次：Actions 页面 → Run workflow
+    - cron: "0 20 * * *"
+  workflow_dispatch:
 
 permissions:
-  contents: write          # 允许它把结果写回你的仓库
+  contents: write
 
 jobs:
   sync-and-build:
@@ -27,7 +17,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # git 需要"提交者身份"才能生成提交；哪怕用不到也先配好，省得报 empty ident name
       - name: 配置 git 身份
         run: |
           git config user.name "github-actions[bot]"
